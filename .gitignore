@@ -7,6 +7,9 @@ android/.gradle
 android/local.properties
 ios/build
 ios/Pods
+# QQ SDK 需用户自行下载，不提交说明文件以外的内容
+android/libs/open_sdk*.jar
+android/libs/open_sdk*.aar
 *.log
 *.tgz
 .DS_Store

@@ -114,11 +114,20 @@ android {
 repositories {
   mavenCentral()
   google()
-  maven { url "https://maven.tencent.com/repository/releases/" }
-  maven { url "https://jitpack.io" }
 }
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
+
+// 检测本地 libs/ 是否有 QQ Open SDK，否则报错提示下载
+def qqSdkFiles = fileTree(dir: 'libs', include: ['open_sdk*.jar', 'open_sdk*.aar'])
+if (qqSdkFiles.isEmpty()) {
+  throw new GradleException(
+    "\n\n[md-native-qq] 未找到腾讯 QQ Open SDK。\n" +
+    "请前往 https://wiki.connect.qq.com/sdk下载 下载 Android SDK，\n" +
+    "将 open_sdk_xxx.jar (或 .aar) 放入：\n" +
+    "  ${project.projectDir}/libs/\n"
+  )
+}
 
 dependencies {
   implementation "com.facebook.react:react-android"
@@ -126,7 +135,6 @@ dependencies {
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
   implementation project(":react-native-nitro-modules")
 
-  // Tencent QQ Open SDK
-  // 若 Maven 拉不到，请将官网下载的 open_sdk_xxx.jar 放到 libs/ 并改为 implementation files('libs/open_sdk_xxx.jar')
-  implementation "com.tencent.tauth:qqopensdk:3.53.0"
+  // QQ Open SDK：本地 libs/ 目录（请先按 PLACE_SDK_HERE.md 放置文件）
+  implementation fileTree(dir: 'libs', include: ['open_sdk*.jar', 'open_sdk*.aar'])
 }
