@@ -1,0 +1,12 @@
+node_modules
+lib
+nitrogen/generated
+android/build
+android/.cxx
+android/.gradle
+android/local.properties
+ios/build
+ios/Pods
+*.log
+*.tgz
+.DS_Store

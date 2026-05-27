@@ -1,0 +1,11 @@
+node_modules
+android/build
+android/.cxx
+android/.gradle
+ios/build
+ios/Pods
+example
+__tests__
+*.log
+.DS_Store
+.github

@@ -1,0 +1,95 @@
+{
+  "name": "md-native-qq",
+  "version": "0.1.0",
+  "description": "腾讯 QQ Open SDK 的 React Native Nitro Modules 封装（登录 / 分享 / QZone）",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/commonjs/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "import": {
+        "types": "./lib/typescript/module/index.d.ts",
+        "default": "./lib/module/index.js"
+      },
+      "require": {
+        "types": "./lib/typescript/commonjs/index.d.ts",
+        "default": "./lib/commonjs/index.js"
+      },
+      "react-native": "./src/index.ts",
+      "default": "./lib/module/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "nitrogen",
+    "nitro.json",
+    "MdNativeQQ.podspec",
+    "react-native.config.js",
+    "!android/build",
+    "!ios/build",
+    "!**/__tests__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "nitrogen": "nitrogen",
+    "build": "bob build",
+    "prepare": "npm run nitrogen -- --log-level=warning && npm run build",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf lib nitrogen/generated android/build ios/build"
+  },
+  "keywords": [
+    "react-native",
+    "nitro-modules",
+    "qq",
+    "tencent",
+    "qzone",
+    "share",
+    "login",
+    "ios",
+    "android"
+  ],
+  "author": "newseaman team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mangdin/md-native-qq.git"
+  },
+  "homepage": "https://github.com/mangdin/md-native-qq#readme",
+  "bugs": {
+    "url": "https://github.com/mangdin/md-native-qq/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "react-native-nitro-modules": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "nitrogen": "^0.35.7",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-builder-bob": "^0.40.0",
+    "react-native-nitro-modules": "0.35.7",
+    "typescript": "^5.8.3"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      ["commonjs", { "esm": true }],
+      ["module", { "esm": true }],
+      ["typescript", { "project": "tsconfig.build.json" }]
+    ]
+  }
+}
