@@ -4,8 +4,7 @@
 #import <TencentOpenAPI/QQApiInterface.h>
 #import <TencentOpenAPI/QQApiInterfaceObject.h>
 #import <TencentOpenAPI/TencentOAuth.h>
-#import <TencentOpenAPI/TencentOAuthObject.h>
-#import <TencentOpenAPI/sdkdef.h>
+#import <TencentOpenAPI/SDKDef.h>
 
 #pragma mark - 工具
 
