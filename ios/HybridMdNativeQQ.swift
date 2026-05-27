@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import TencentOpenAPI
 import NitroModules
 
 private enum QQError: Error, CustomStringConvertible {

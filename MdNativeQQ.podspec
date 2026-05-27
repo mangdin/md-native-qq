@@ -31,14 +31,13 @@ Pod::Spec.new do |s|
   s.resources           = "ios/TencentOpenApi_IOS_Bundle.bundle"
 
   s.pod_target_xcconfig = {
-    "SWIFT_VERSION"                     => "5.0",
-    "SWIFT_OBJC_BRIDGING_HEADER"        => "$(PODS_TARGET_SRCROOT)/ios/MdNativeQQ-Bridging-Header.h",
+    "SWIFT_VERSION"                       => "5.0",
     "SWIFT_ACTIVE_COMPILATION_CONDITIONS" => "$(inherited)",
-    "HEADER_SEARCH_PATHS"               => "$(inherited) ${PODS_ROOT}/RCT-Folly",
-    "GCC_PREPROCESSOR_DEFINITIONS"      => "$(inherited) FOLLY_NO_CONFIG FOLLY_MOBILE=1 FOLLY_USE_LIBCPP=1 FOLLY_CFG_NO_COROUTINES",
-    "OTHER_CPLUSPLUSFLAGS"              => "$(inherited) #{folly_compiler_flags}",
-    "PRODUCT_MODULE_NAME"               => "MdNativeQQ",
-    "OTHER_LDFLAGS"                     => "$(inherited) -ObjC"
+    "HEADER_SEARCH_PATHS"                 => "$(inherited) ${PODS_ROOT}/RCT-Folly",
+    "GCC_PREPROCESSOR_DEFINITIONS"        => "$(inherited) FOLLY_NO_CONFIG FOLLY_MOBILE=1 FOLLY_USE_LIBCPP=1 FOLLY_CFG_NO_COROUTINES",
+    "OTHER_CPLUSPLUSFLAGS"                => "$(inherited) #{folly_compiler_flags}",
+    "PRODUCT_MODULE_NAME"                 => "MdNativeQQ",
+    "OTHER_LDFLAGS"                       => "$(inherited) -ObjC"
   }
 
   s.frameworks = "Security", "SystemConfiguration", "CoreGraphics", "CoreTelephony", "WebKit"
