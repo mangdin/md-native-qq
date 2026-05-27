@@ -8,19 +8,11 @@
   if ([TencentOAuth CanHandleOpenURL:url]) {
     return [TencentOAuth HandleOpenURL:url];
   }
-  if ([QQApiInterface canHandleUrl:url]) {
-    return [QQApiInterface handleOpenURL:url delegate:nil];
-  }
-  return NO;
+  return [QQApiInterface handleOpenURL:url delegate:nil];
 }
 
 + (BOOL)handleUniversalLink:(NSUserActivity *)userActivity {
-  if ([TencentOAuth CanHandleUniversalLink:userActivity.webpageURL]) {
-    return [TencentOAuth HandleUniversalLink:userActivity.webpageURL];
-  }
-  if ([QQApiInterface canHandleUniversallink:userActivity.webpageURL]) {
-    return [QQApiInterface handleOpenUniversallink:userActivity.webpageURL delegate:nil];
-  }
+  // This SDK version does not support Universal Link callbacks
   return NO;
 }
 
