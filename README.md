@@ -95,26 +95,36 @@ continueUserActivity:(NSUserActivity *)userActivity
 }
 ```
 
-Swift 版本同理：
+#### Swift AppDelegate（Expo / 新模板）
 
-```swift
-import MdNativeQQ
+本库是 ObjC 静态库，**Swift 端不能直接 `import MdNativeQQ`**（会报 `No such module`），需要走 RN 标准的 Bridging Header 模式：
 
-func application(_ app: UIApplication, open url: URL,
-                 options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool {
-  if MdNativeQQURLHandler.handleOpen(url) { return true }
-  return RCTLinkingManager.application(app, open: url, options: options)
-}
+1. 在 `<App>-Bridging-Header.h` 加入：
 
-func application(_ application: UIApplication,
-                 continue userActivity: NSUserActivity,
-                 restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-  if MdNativeQQURLHandler.handleUniversalLink(userActivity) { return true }
-  return RCTLinkingManager.application(application,
-                                       continue: userActivity,
-                                       restorationHandler: restorationHandler)
-}
-```
+   ```objc
+   #import <MdNativeQQ/MdNativeQQURLHandler.h>
+   ```
+
+2. `AppDelegate.swift` 里**不需要 import MdNativeQQ**，直接调用：
+
+   ```swift
+   override func application(_ app: UIApplication, open url: URL,
+                             options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+     if MdNativeQQURLHandler.handleOpen(url) { return true }
+     return RCTLinkingManager.application(app, open: url, options: options)
+   }
+
+   override func application(_ application: UIApplication,
+                             continue userActivity: NSUserActivity,
+                             restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+     if MdNativeQQURLHandler.handleUniversalLink(userActivity) { return true }
+     return RCTLinkingManager.application(application,
+                                          continue: userActivity,
+                                          restorationHandler: restorationHandler)
+   }
+   ```
+
+   ObjC 方法名自动桥接：`handleOpenURL:` → Swift `handleOpen(_:)`，`handleUniversalLink:` → Swift `handleUniversalLink(_:)`。
 
 ---
 
@@ -308,3 +318,5 @@ cd ios && bundle exec pod install
 - Android `qqopensdk` 同样必须自己下载。维护成本是手动升级，收益是构建可控、出问题不用等腾讯发版。
 - 模拟器调试只能验证 SDK 加载和 JS 桥；登录 / 分享必须真机+真 QQ。
 - `shareMiniProgram` 在 iOS 端依赖 `QQApiMiniProgramObject`，仅 3.5.x 以上 SDK 提供；老版本会同步 reject。
+- **iOS 链接器**：podspec 通过 `user_target_xcconfig` 自动向宿主 app 注入 `-ld_classic`。原因是 Xcode 15+ 默认的 `ld_prime` 与腾讯老工具链编译出的 `TencentOpenAPI` 二进制里的 alias 符号布局冲突，会触发 `Layout.cpp:2899` 断言（LLVM 已知 bug [llvm-project#64157](https://github.com/llvm/llvm-project/issues/64157)）。`ld_classic` 比新 linker 慢一些，但目前是唯一稳定方案，等腾讯出新工具链编的 xcframework 后会移除。
+- iOS 模拟器：腾讯 SDK 长期未提供 `ios-arm64-simulator` slice，Apple Silicon Mac 上跑模拟器需要 `EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64` 走 Intel 模拟器。真机不受影响。

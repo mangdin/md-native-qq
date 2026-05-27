@@ -70,7 +70,12 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
   @ReactMethod
   fun getApiVersion(callback: Callback) {
-    callback.invoke(null, Tencent.getSdkVersion() ?: "unknown")
+    // 全量版 QQ SDK 有 Tencent.getSdkVersion()，lite 版去掉了，这里 reflect 兼容两者
+    val v = runCatching {
+      val m = Tencent::class.java.getDeclaredMethod("getSdkVersion")
+      m.invoke(null) as? String
+    }.getOrNull() ?: "unknown"
+    callback.invoke(null, v)
   }
 
   /** Android 不需要 Universal Link，直接 resolve 空。 */
@@ -89,8 +94,8 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
     val t = tencent ?: run {
       callback.invoke("QQ SDK 未初始化，请先 registerApp"); return
     }
-    val activity = currentActivity ?: run {
-      callback.invoke("currentActivity 为空，请在 MainActivity 中调用 MdNativeQQActivityBridge.setCurrentActivity")
+    val activity = activeActivity ?: run {
+      callback.invoke("activity 为空，请在 MainActivity 中调用 MdNativeQQActivityBridge.setCurrentActivity，或确认 RN 已正确跟踪 Activity 生命周期")
       return
     }
     val scopes = if (params.hasKey("scopes") && params.getString("scopes")?.isNotBlank() == true) {
@@ -136,7 +141,7 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
   private fun runShareToQQ(params: Bundle, callback: Callback) {
     val t = tencent ?: run { callback.invoke("QQ SDK 未初始化"); return }
-    val activity = currentActivity ?: run { callback.invoke("currentActivity 为空"); return }
+    val activity = activeActivity ?: run { callback.invoke("activity 为空"); return }
     shareListener.set(ShareListener(this))
     activity.runOnUiThread { t.shareToQQ(activity, params, shareListener.get()) }
     callback.invoke(null)
@@ -144,7 +149,7 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
   private fun runShareToQzone(params: Bundle, callback: Callback) {
     val t = tencent ?: run { callback.invoke("QQ SDK 未初始化"); return }
-    val activity = currentActivity ?: run { callback.invoke("currentActivity 为空"); return }
+    val activity = activeActivity ?: run { callback.invoke("activity 为空"); return }
     shareListener.set(ShareListener(this))
     activity.runOnUiThread { t.shareToQzone(activity, params, shareListener.get()) }
     callback.invoke(null)
@@ -152,7 +157,7 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
   private fun runPublishToQzone(params: Bundle, callback: Callback) {
     val t = tencent ?: run { callback.invoke("QQ SDK 未初始化"); return }
-    val activity = currentActivity ?: run { callback.invoke("currentActivity 为空"); return }
+    val activity = activeActivity ?: run { callback.invoke("activity 为空"); return }
     publishListener.set(PublishListener(this))
     activity.runOnUiThread { t.publishToQzone(activity, params, publishListener.get()) }
     callback.invoke(null)
@@ -165,8 +170,17 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
   @ReactMethod
   fun shareText(options: ReadableMap, callback: Callback) {
+    // QQ Open SDK lite 版（3.5.x 之后官方推送的版本）移除了纯文本类型，
+    // 全量版 jar 才有 SHARE_TO_QQ_TYPE_TEXT(=6)。这里 reflect 探测，没有就友好报错。
+    val textType = runCatching {
+      QQShare::class.java.getField("SHARE_TO_QQ_TYPE_TEXT").getInt(null)
+    }.getOrNull()
+    if (textType == null) {
+      callback.invoke("当前 QQ Open SDK（lite 版）不支持纯文本分享，请使用 shareLink 替代")
+      return
+    }
     val params = Bundle().apply {
-      putInt(QQShare.SHARE_TO_QQ_KEY_TYPE, QQShare.SHARE_TO_QQ_TYPE_TEXT)
+      putInt(QQShare.SHARE_TO_QQ_KEY_TYPE, textType)
       putString(QQShare.SHARE_TO_QQ_SUMMARY, options.getString("text"))
       if (options.hasKey("title")) putString(QQShare.SHARE_TO_QQ_TITLE, options.getString("title"))
     }
@@ -226,8 +240,15 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
   @ReactMethod
   fun shareMiniProgram(options: ReadableMap, callback: Callback) {
+    // lite 版常量是 SHARE_TO_QQ_MINI_PROGRAM (=7)，全量版是 SHARE_TO_QQ_TYPE_MINI_PROGRAM，
+    // 名字不一样数值一样。先按 lite 版常量名取，没有再 reflect 兜底。
+    val miniType = runCatching {
+      QQShare::class.java.getField("SHARE_TO_QQ_MINI_PROGRAM").getInt(null)
+    }.getOrNull() ?: runCatching {
+      QQShare::class.java.getField("SHARE_TO_QQ_TYPE_MINI_PROGRAM").getInt(null)
+    }.getOrNull() ?: 7
     val params = Bundle().apply {
-      putInt(QQShare.SHARE_TO_QQ_KEY_TYPE, QQShare.SHARE_TO_QQ_TYPE_MINI_PROGRAM)
+      putInt(QQShare.SHARE_TO_QQ_KEY_TYPE, miniType)
       putString(QQShare.SHARE_TO_QQ_TITLE, options.getString("title"))
       if (options.hasKey("description")) putString(QQShare.SHARE_TO_QQ_SUMMARY, options.getString("description"))
       putString(QQShare.SHARE_TO_QQ_TARGET_URL, options.getString("webpageUrl"))
@@ -309,11 +330,20 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
     if (logEnabled) Log.d("MdNativeQQ", "$logPrefix$s")
   }
 
+  // ---- Activity 解析 ----
+  //
+  // 优先用 host 通过 MdNativeQQActivityBridge.setCurrentActivity 显式注入的 Activity；
+  // 没有注入时回退到 ReactContextBaseJavaModule.getCurrentActivity()（多数 RN 工程已自动跟踪）。
+  // 注意：不能把 companion 的字段命名为 currentActivity，否则 @JvmStatic 生成的
+  // getCurrentActivity() 会与父类同签名方法触发 "Accidental override" 编译错误。
+  private val activeActivity: Activity?
+    get() = hostActivity ?: getCurrentActivity()  // 显式调父类方法，不依赖 Kotlin 的 Java getter 属性合成
+
   // ---- 静态：处理 Activity 回跳 ----
 
   companion object {
     @JvmStatic
-    var currentActivity: Activity? = null
+    internal var hostActivity: Activity? = null
 
     private val instance = AtomicReference<MdNativeQQModule?>()
     private val loginListener = AtomicReference<IUiListener?>()
@@ -322,10 +352,14 @@ class MdNativeQQModule(private val reactCtx: ReactApplicationContext) :
 
     @JvmStatic
     fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+      // lite 版只剩 REQUEST_LOGIN（全量版还有 REQUEST_OLD_LOGIN），其它 share 用的 code 两版一致。
+      // REQUEST_OLD_SHARE / REQUEST_OLD_QZSHARE 是 SDK 内部 fallback 路径，顺手一起接住。
       val listener = when (requestCode) {
-        Constants.REQUEST_LOGIN, Constants.REQUEST_OLD_LOGIN -> loginListener.get()
-        Constants.REQUEST_QQ_SHARE -> shareListener.get()
-        Constants.REQUEST_QZONE_SHARE -> publishListener.get() ?: shareListener.get()
+        Constants.REQUEST_LOGIN -> loginListener.get()
+        Constants.REQUEST_QQ_SHARE, Constants.REQUEST_OLD_SHARE -> shareListener.get()
+        Constants.REQUEST_QZONE_SHARE, Constants.REQUEST_OLD_QZSHARE ->
+          publishListener.get() ?: shareListener.get()
+        Constants.REQUEST_QQ_FAVORITES -> shareListener.get()
         else -> null
       } ?: return
       Tencent.onActivityResultData(requestCode, resultCode, data, listener)

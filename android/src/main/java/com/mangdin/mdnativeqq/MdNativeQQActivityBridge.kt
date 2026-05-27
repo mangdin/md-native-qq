@@ -23,7 +23,7 @@ import android.content.Intent
 object MdNativeQQActivityBridge {
   @JvmStatic
   fun setCurrentActivity(activity: Activity?) {
-    MdNativeQQModule.currentActivity = activity
+    MdNativeQQModule.hostActivity = activity
   }
 
   @JvmStatic
