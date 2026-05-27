@@ -1,12 +1,12 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
-folly_compiler_flags = '-DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1'
 
 Pod::Spec.new do |s|
   s.name         = "MdNativeQQ"
   s.version      = package["version"]
   s.summary      = package["description"]
+  s.description  = package["description"]
   s.homepage     = package["homepage"]
   s.license      = package["license"]
   s.authors      = package["author"]
@@ -14,41 +14,36 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "13.0" }
   s.source       = { :git => package["repository"]["url"].sub(/^git\+/, ''), :tag => "#{s.version}" }
 
-  s.source_files = [
-    "ios/**/*.{swift}",
-    "ios/**/*.{m,mm}",
-    "ios/**/*.{h}"
-  ]
+  s.source_files = "ios/**/*.{h,m,mm}"
 
-  s.exclude_files = [
-    "ios/MdNativeQQ-Bridging-Header.h",
-    "ios/TencentOpenAPI.xcframework/**",
-    "ios/TencentOpenApi_IOS_Bundle.bundle/**"
-  ]
+  # ---- 强校验 vendored 的 TencentOpenAPI ----
+  framework_path = File.join(__dir__, "ios", "TencentOpenAPI.xcframework")
+  bundle_path    = File.join(__dir__, "ios", "TencentOpenApi_IOS_Bundle.bundle")
+  unless File.exist?(framework_path) && File.exist?(bundle_path)
+    raise <<~MSG
 
-  # TencentOpenAPI.xcframework + bundle 随包内置，无需额外 pod 依赖
+      [md-native-qq] 未找到 TencentOpenAPI.xcframework / TencentOpenApi_IOS_Bundle.bundle。
+
+      请前往 https://wiki.connect.qq.com/sdk下载 下载最新版 iOS SDK，把
+        TencentOpenAPI.xcframework
+        TencentOpenApi_IOS_Bundle.bundle
+      两件套放入：
+        #{File.join(__dir__, 'ios')}
+
+      详见 ios/PLACE_SDK_HERE.md
+    MSG
+  end
+
   s.vendored_frameworks = "ios/TencentOpenAPI.xcframework"
   s.resources           = "ios/TencentOpenApi_IOS_Bundle.bundle"
 
-  s.pod_target_xcconfig = {
-    "SWIFT_VERSION"                       => "5.0",
-    "SWIFT_ACTIVE_COMPILATION_CONDITIONS" => "$(inherited)",
-    "HEADER_SEARCH_PATHS"                 => "$(inherited) ${PODS_ROOT}/RCT-Folly",
-    "GCC_PREPROCESSOR_DEFINITIONS"        => "$(inherited) FOLLY_NO_CONFIG FOLLY_MOBILE=1 FOLLY_USE_LIBCPP=1 FOLLY_CFG_NO_COROUTINES",
-    "OTHER_CPLUSPLUSFLAGS"                => "$(inherited) #{folly_compiler_flags}",
-    "PRODUCT_MODULE_NAME"                 => "MdNativeQQ",
-    "OTHER_LDFLAGS"                       => "$(inherited) -ObjC"
-  }
-
+  # 腾讯 SDK 官方文档要求的链接器选项 / 系统框架
   s.frameworks = "Security", "SystemConfiguration", "CoreGraphics", "CoreTelephony", "WebKit"
   s.libraries  = "iconv", "sqlite3", "stdc++", "z"
 
-  s.dependency "React-Core"
-  s.dependency "React-jsi"
-  s.dependency "React-callinvoker"
-
-  load File.join(__dir__, 'nitrogen/generated/ios/MdNativeQQ+autolinking.rb')
-  add_nitrogen_files(s)
+  s.pod_target_xcconfig = {
+    "OTHER_LDFLAGS" => "$(inherited) -ObjC"
+  }
 
   install_modules_dependencies(s)
 end

@@ -3,7 +3,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// 在宿主 App 的 AppDelegate / SceneDelegate 中调用，用于把 QQ 回跳事件转交给 SDK。
+/**
+ * 宿主 App 在 AppDelegate / SceneDelegate 中调用，把 QQ 互联回跳事件
+ * 转交给 TencentOpenAPI。两种回跳都要接：
+ *
+ *   - openURL（mqq:// / tencent[APPID]:// scheme）
+ *   - Universal Link（iOS 9+，QQ 互联后台配置）
+ */
 @interface MdNativeQQURLHandler : NSObject
 
 + (BOOL)handleOpenURL:(NSURL *)url;

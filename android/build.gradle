@@ -14,76 +14,25 @@ buildscript {
   }
 }
 
-def reactNativeArchitectures() {
-  def value = rootProject.getProperties().get("reactNativeArchitectures")
-  return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
-}
-
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
-apply from: '../nitrogen/generated/android/MdNativeQQ+autolinking.gradle'
-
-apply plugin: "com.facebook.react"
 
 def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["MdNativeQQ_" + name]).toInteger()
 }
 
 android {
-  namespace "com.margelo.nitro.mdnativeqq"
+  namespace "com.mangdin.mdnativeqq"
 
   compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
 
   defaultConfig {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
-
-    externalNativeBuild {
-      cmake {
-        cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
-        arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
-        abiFilters(*reactNativeArchitectures())
-
-        buildTypes {
-          debug {
-            cppFlags "-O1 -g"
-          }
-          release {
-            cppFlags "-O2"
-          }
-        }
-      }
-    }
-  }
-
-  externalNativeBuild {
-    cmake {
-      path "CMakeLists.txt"
-    }
-  }
-
-  packagingOptions {
-    excludes = [
-      "META-INF",
-      "META-INF/**",
-      "**/libc++_shared.so",
-      "**/libfbjni.so",
-      "**/libjsi.so",
-      "**/libfolly_json.so",
-      "**/libfolly_runtime.so",
-      "**/libglog.so",
-      "**/libhermes.so",
-      "**/libreactnative.so",
-      "**/libreactnativejni.so",
-      "**/libturbomodulejsijni.so",
-      "**/libreact_nativemodule_core.so",
-      "**/libjscexecutor.so"
-    ]
   }
 
   buildFeatures {
     buildConfig true
-    prefab true
   }
 
   buildTypes {
@@ -101,13 +50,9 @@ android {
     jvmTarget = "17"
   }
 
-  sourceSets {
-    main {
-      java.srcDirs += [
-        "generated/java",
-        "generated/jni"
-      ]
-    }
+  packagingOptions {
+    pickFirst "META-INF/INDEX.LIST"
+    pickFirst "META-INF/io.netty.versions.properties"
   }
 }
 
@@ -118,23 +63,23 @@ repositories {
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
 
-// 检测本地 libs/ 是否有 QQ Open SDK，否则报错提示下载
+// ---- QQ Open SDK：必须由调用方手动放进 libs/ ----
 def qqSdkFiles = fileTree(dir: 'libs', include: ['open_sdk*.jar', 'open_sdk*.aar'])
 if (qqSdkFiles.isEmpty()) {
   throw new GradleException(
-    "\n\n[md-native-qq] 未找到腾讯 QQ Open SDK。\n" +
-    "请前往 https://wiki.connect.qq.com/sdk下载 下载 Android SDK，\n" +
-    "将 open_sdk_xxx.jar (或 .aar) 放入：\n" +
-    "  ${project.projectDir}/libs/\n"
+    "\n\n[md-native-qq] 未找到腾讯 QQ Open SDK Android 包。\n" +
+    "请前往 https://wiki.connect.qq.com/sdk下载 下载最新 Android SDK，\n" +
+    "把 open_sdk_xxx.jar 或 .aar 放入：\n" +
+    "  ${project.projectDir}/libs/\n" +
+    "详见 android/libs/PLACE_SDK_HERE.md\n"
   )
 }
 
 dependencies {
   implementation "com.facebook.react:react-android"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
-  implementation project(":react-native-nitro-modules")
+  implementation "androidx.core:core:1.13.0"
 
-  // QQ Open SDK：本地 libs/ 目录（请先按 PLACE_SDK_HERE.md 放置文件）
+  // 本地 libs/ 内的 QQ Open SDK（jar / aar 均可）
   implementation fileTree(dir: 'libs', include: ['open_sdk*.jar', 'open_sdk*.aar'])
 }

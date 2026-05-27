@@ -1,8 +1,53 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- 读取设备信息：腾讯 SDK 内部用于风控，targetSdk 29+ 后已废弃，保留以兼容旧机 -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="merge" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+                     android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <queries>
+        <!-- targetSdk 30+ 的包可见性，否则 isQQInstalled 始终返回 false -->
+        <package android:name="com.tencent.mobileqq" />
+        <package android:name="com.tencent.tim" />
+        <package android:name="com.qzone" />
+    </queries>
+
+    <application>
+        <!-- QQ Open SDK 登录回跳 Activity -->
+        <activity android:name="com.tencent.tauth.AuthActivity"
+                  android:noHistory="true"
+                  android:launchMode="singleTask"
+                  android:exported="true"
+                  tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- scheme 由宿主 App 的 manifestPlaceholders 注入：qqAppId=1234567 -->
+                <data android:scheme="tencent${qqAppId}" />
+            </intent-filter>
+        </activity>
+
+        <!-- QQ Open SDK 工具 Activity（分享 / 登录态切换的中转） -->
+        <activity android:name="com.tencent.connect.common.AssistActivity"
+                  android:theme="@android:style/Theme.Translucent.NoTitleBar"
+                  android:configChanges="orientation|keyboardHidden|screenSize"
+                  android:exported="false"
+                  tools:node="merge" />
+
+        <!-- 本库自带的 FileProvider，authority=${applicationId}.mdqq.fileprovider，
+             宿主无需再写自己的 fileprovider 配置 -->
+        <provider android:name="com.mangdin.mdnativeqq.MdNativeQQFileProvider"
+                  android:authorities="${applicationId}.mdqq.fileprovider"
+                  android:exported="false"
+                  android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                       android:resource="@xml/md_native_qq_file_paths" />
+        </provider>
+    </application>
 </manifest>

@@ -1,30 +1,39 @@
 # md-native-qq
 
-腾讯 QQ 互联（QQ Open SDK）的 React Native **Nitro Modules** 封装，提供 QQ 登录、分享到 QQ / QZone、判断 QQ 是否安装等能力。设计与 `native-wechat`、`react-native-alipay-v5` 风格一致，可与之并列使用。
+腾讯 QQ 互联（QQ Open SDK）的 React Native 封装。提供 QQ 登录、分享到 QQ / QZone、判断 QQ 是否安装等能力。
 
-- iOS：基于官方 `TencentOpenAPI`
-- Android：基于官方 `com.tencent.tauth:qqopensdk`
-- React Native **新架构**（Fabric / TurboModules）原生支持，依赖 [`react-native-nitro-modules`](https://github.com/mrousavy/nitro)
-- 全 API Promise 化，TS 类型完整
+- 底层：**NativeModules + NativeEventEmitter**（无 Nitro / 无 TurboModule 强依赖，新旧架构都能跑）
+- 全 API Promise 化，TypeScript 类型完整
+- iOS：基于官方 **TencentOpenAPI**（手动 vendor 最新 xcframework）
+- Android：基于官方 **com.tencent.tauth:qqopensdk**（本地 `libs/open_sdk_*.jar`）
+- 完整支持 iOS Universal Link
+- 显式隐私授权 API，符合工信部信管函〔2021〕169 号要求
+
+---
 
 ## 1. 安装
 
 ```bash
-npm install md-native-qq react-native-nitro-modules
+npm install md-native-qq
 cd ios && bundle exec pod install
 ```
 
-> 因为这是 Nitro 模块，**首次安装或修改 spec 后必须先生成桥接代码**：
-> ```bash
-> cd node_modules/md-native-qq && npm run nitrogen
-> ```
-> 把这一步加到根项目的 `postinstall` 里更稳妥。
+> Expo Go 不支持，必须 `npx expo prebuild` 后使用，或直接在 bare RN 工程里使用。
 
-## 2. 原生侧接入
+### 1.1 放置原生 SDK（必须）
 
-### 2.1 iOS
+出于体积 & 腾讯许可考虑，原生 SDK 不随 npm 包发布。安装后请按以下两份文件指引手动放置：
 
-#### Info.plist
+- iOS：`node_modules/md-native-qq/ios/PLACE_SDK_HERE.md`
+- Android：`node_modules/md-native-qq/android/libs/PLACE_SDK_HERE.md`
+
+落不到位时，`pod install` 或 `gradle sync` 会直接抛错并打印放置说明，不会偷偷过掉。
+
+---
+
+## 2. iOS 接入
+
+### 2.1 Info.plist
 
 ```xml
 <key>CFBundleURLTypes</key>
@@ -32,8 +41,8 @@ cd ios && bundle exec pod install
   <dict>
     <key>CFBundleURLSchemes</key>
     <array>
-      <string>tencent你的AppID</string>
-      <string>QQ你的AppID16进制</string>
+      <string>tencent你的AppID</string>     <!-- 例：tencent102xxxxxx -->
+      <string>QQ你的AppID16进制</string>   <!-- 例：QQ06FAxxxx，大写无前导零 -->
       <string>QQLaunch</string>
     </array>
   </dict>
@@ -52,74 +61,85 @@ cd ios && bundle exec pod install
   <string>wtloginmqq2</string>
 </array>
 
-<!-- iOS 9+ ATS（如需 http 资源） -->
-<key>NSAppTransportSecurity</key>
-<dict>
-  <key>NSAllowsArbitraryLoads</key><true/>
-</dict>
+<!-- 隐私政策必填项（应用上架时审核会查） -->
+<key>NSPhotoLibraryUsageDescription</key>
+<string>用于在分享时选择图片</string>
 ```
 
-#### AppDelegate（Swift 示例）
+### 2.2 Universal Link
+
+1. 在 [QQ 互联后台](https://connect.qq.com/) 应用详情页 → "Universal Links 配置"，填入形如 `https://app.example.com/qq/` 的链接。
+2. 把腾讯下发的 `apple-app-site-association`（**不要带 `.json` 后缀**）部署到该域名根目录 `/.well-known/`，HTTPS 必须正常。
+3. Xcode 工程 Signing & Capabilities 添加 **Associated Domains**：`applinks:app.example.com`。
+4. App 首次启动调 `checkUniversalLinkReady()` 可以做自检。
+
+### 2.3 AppDelegate
+
+`AppDelegate.mm`（默认模板）：
+
+```objc
+#import "MdNativeQQURLHandler.h"
+
+- (BOOL)application:(UIApplication *)application
+            openURL:(NSURL *)url
+            options:(NSDictionary<UIApplicationOpenURLOptionsKey,id> *)options {
+  if ([MdNativeQQURLHandler handleOpenURL:url]) return YES;
+  return [RCTLinkingManager application:application openURL:url options:options];
+}
+
+- (BOOL)application:(UIApplication *)application
+continueUserActivity:(NSUserActivity *)userActivity
+ restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> * _Nullable))restorationHandler {
+  if ([MdNativeQQURLHandler handleUniversalLink:userActivity]) return YES;
+  return [RCTLinkingManager application:application continueUserActivity:userActivity restorationHandler:restorationHandler];
+}
+```
+
+Swift 版本同理：
 
 ```swift
 import MdNativeQQ
 
-func application(_ app: UIApplication, open url: URL, options: [...]) -> Bool {
-  if MdNativeQQURLHandler.handleOpenURL(url) { return true }
-  return false
+func application(_ app: UIApplication, open url: URL,
+                 options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool {
+  if MdNativeQQURLHandler.handleOpen(url) { return true }
+  return RCTLinkingManager.application(app, open: url, options: options)
 }
 
 func application(_ application: UIApplication,
                  continue userActivity: NSUserActivity,
                  restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
   if MdNativeQQURLHandler.handleUniversalLink(userActivity) { return true }
-  return false
+  return RCTLinkingManager.application(application,
+                                       continue: userActivity,
+                                       restorationHandler: restorationHandler)
 }
 ```
 
-> Universal Link 必须在 QQ 互联后台配置一致，否则 iOS 13+ 唤起会失败。
+---
 
-### 2.2 Android
+## 3. Android 接入
 
-#### AndroidManifest.xml（宿主 App）
+### 3.1 manifestPlaceholders
 
-```xml
-<activity
-  android:name="com.tencent.tauth.AuthActivity"
-  android:noHistory="true"
-  android:launchMode="singleTask"
-  android:exported="true">
-  <intent-filter>
-    <action android:name="android.intent.action.VIEW"/>
-    <category android:name="android.intent.category.DEFAULT"/>
-    <category android:name="android.intent.category.BROWSABLE"/>
-    <data android:scheme="tencent你的AppID"/>
-  </intent-filter>
-</activity>
+`android/app/build.gradle`：
 
-<activity
-  android:name="com.tencent.connect.common.AssistActivity"
-  android:theme="@android:style/Theme.Translucent.NoTitleBar"
-  android:configChanges="orientation|keyboardHidden|screenSize"
-  android:exported="false"/>
-
-<provider
-  android:name="androidx.core.content.FileProvider"
-  android:authorities="${applicationId}.fileprovider"
-  android:exported="false"
-  android:grantUriPermissions="true">
-  <meta-data
-    android:name="android.support.FILE_PROVIDER_PATHS"
-    android:resource="@xml/file_paths"/>
-</provider>
+```groovy
+android {
+  defaultConfig {
+    manifestPlaceholders = [
+      qqAppId: "102xxxxxx"   // 与 JS 侧 registerApp 的 appId 完全一致
+    ]
+  }
+}
 ```
 
-#### MainActivity
+> 库自带的 `AndroidManifest.xml` 已经声明了 `AuthActivity` / `AssistActivity` / `MdNativeQQFileProvider`，**宿主无需再写**，只要注入 `qqAppId` 即可。
 
-QQ SDK 走的是 `onActivityResult` 回调，需要在 MainActivity 转发：
+### 3.2 MainActivity 转发
 
 ```kotlin
-import com.margelo.nitro.mdnativeqq.MdNativeQQActivityBridge
+import com.mangdin.mdnativeqq.MdNativeQQActivityBridge
 
 class MainActivity : ReactActivity() {
   override fun onResume() {
@@ -137,28 +157,50 @@ class MainActivity : ReactActivity() {
 }
 ```
 
-> 若 Maven 拉不到 `com.tencent.tauth:qqopensdk`，请在 wiki.connect.qq.com 下载 `open_sdk_xxx.jar` 放入 `android/app/libs/`，并在 `android/build.gradle` 里把对应 implementation 改为 `implementation files('libs/open_sdk_xxx.jar')`。
+### 3.3 注册 ReactPackage
 
-## 3. JS 使用
+老架构 / `MainApplication.kt`：
+
+```kotlin
+override fun getPackages(): List<ReactPackage> =
+  PackageList(this).packages.apply {
+    add(MdNativeQQPackage())
+  }
+```
+
+新架构（autolinking）会自动接管，不需要手动加。
+
+---
+
+## 4. JS 使用
 
 ```ts
-import QQ, { QQScene } from 'md-native-qq';
+import QQ, { registerApp, login, shareLink, publishToQzone } from 'md-native-qq';
 
-// 1. 初始化（在 App 启动入口调一次）
-QQ.registerApp({
+// 1. 隐私协议弹窗确认 → registerApp
+await showPrivacyDialog();   // 你自己的弹窗
+registerApp({
   appId: '102xxxxxx',
-  universalLink: 'https://app.example.com/qq/',  // iOS 必填
+  universalLink: 'https://app.example.com/qq/',   // iOS 必填
+  agreePrivacy: true,                              // 关键：用户同意后必须为 true
+  log: __DEV__,
 });
 
-// 2. 检测
-QQ.isQQInstalled();    // boolean
-QQ.getApiVersion();    // string
+// 2. 自检（仅 iOS 有意义）
+const { suggestion, errorInfo } = await QQ.checkUniversalLinkReady();
+if (errorInfo) console.warn('UL 配置异常：', suggestion);
 
-// 3. 登录
-const { openId, accessToken, expiresIn } = await QQ.login('get_user_info,get_simple_userinfo');
+// 3. 检测
+await QQ.isQQInstalled();
+await QQ.getApiVersion();
 
-// 4. 分享给 QQ 好友
-await QQ.shareLink({
+// 4. 登录
+const { openId, accessToken, expiresIn } = await login(
+  'get_user_info,get_simple_userinfo'
+);
+
+// 5. 分享到 QQ 好友
+await shareLink({
   scene: 'qq',
   title: '招聘信息',
   description: '海员急招，月薪 2 万起',
@@ -166,68 +208,103 @@ await QQ.shareLink({
   thumbImageUrl: 'https://newseaman.com/cover.jpg',
 });
 
-// 5. 分享到 QZone（图文动态）
-await QQ.publishToQzone({
+// 6. 发布到 QZone
+await publishToQzone({
   text: '今天上船啦~',
   imageUrls: ['/sdcard/DCIM/1.jpg', '/sdcard/DCIM/2.jpg'],
 });
 ```
 
-## 4. 在 newseaman 中替换 ShareAlertDialog
-
-`js/pages/common/ShareAlertDialog.js` 中已有 QQ 按钮，把注释打开并改为：
-
-```js
-import QQ from 'md-native-qq';
-
-componentDidMount() {
-  QQ.registerApp({
-    appId: 'YOUR_APP_ID',
-    universalLink: 'https://app.newseaman.com/qq/',
-  });
-}
-
-_qq() {
-  QQ.shareLink({
-    scene: 'qq',
-    title: this.props.title,
-    description: this.props.desc,
-    webpageUrl: this.props.url,
-    thumbImageUrl: this.props.thumb,
-  }).catch(err => Toast.show({ type: 'error', text1: String(err) }));
-}
-```
+---
 
 ## 5. API 速查
 
 | 方法 | 说明 |
 | --- | --- |
-| `registerApp({ appId, universalLink? })` | 初始化，必须最先调用 |
-| `isQQInstalled()` | 是否安装手机 QQ |
-| `getApiVersion()` | 当前 SDK 版本 |
-| `login(scopes?)` | OAuth 授权，返回 `{ openId, accessToken, expiresIn, expirationDate, authCode? }` |
-| `logout()` | 清除登录态 |
-| `shareText({ scene, text, title? })` | 纯文本（仅好友/收藏） |
+| `registerApp({ appId, universalLink?, agreePrivacy?, log?, logPrefix? })` | 初始化。`agreePrivacy` 必须在弹完隐私弹窗后才设 true，否则 SDK 不允许联网 |
+| `checkUniversalLinkReady()` | iOS Universal Link 自检；Android 直接 resolve 空 |
+| `isQQInstalled()` | `Promise<boolean>` |
+| `getApiVersion()` | `Promise<string>` |
+| `login(scopes?)` | 拉起授权，`Promise<QQLoginResult>` |
+| `logout()` | 清登录态 |
+| `shareText({ scene, text, title? })` | 文本，仅 `'qq'` / `'favorites'` 真正生效 |
 | `shareImage({ scene, imageUrl, title?, description? })` | 图片，本地路径或 http(s) |
 | `shareLink({ scene, title, description?, webpageUrl, thumbImageUrl? })` | 图文链接 |
-| `shareMusic({ scene, title, webpageUrl, musicUrl, ... })` | 音乐 |
-| `shareMiniProgram({ ... })` | QQ 小程序 |
-| `shareVideo({ scene: 'qzone', videoUrl, ... })` | QZone 视频发布 |
+| `shareMusic({ scene, title, description?, webpageUrl, musicUrl, thumbImageUrl? })` | 音乐 |
+| `shareMiniProgram({ scene, title, description?, webpageUrl, thumbImageUrl?, miniAppId, miniPath, miniProgramType? })` | QQ 小程序，需要 SDK ≥ 3.5.x |
+| `shareVideo({ scene: 'qzone', videoUrl, title?, description?, thumbImageUrl? })` | QZone 视频发布 |
 | `publishToQzone({ text, imageUrls })` | QZone 图文动态 |
 
 `scene` 取值：`'qq' | 'qzone' | 'favorites'`。
 
-## 6. 开发
+`QQLoginResult`：
 
-```bash
-npm install                   # 安装依赖
-npm run nitrogen              # 生成 Nitro 桥接代码
-npm run build                 # 输出 lib/
-npm run typecheck
+```ts
+{
+  openId: string;
+  accessToken: string;
+  expiresIn: number;        // 秒
+  expirationDate: number;   // Unix timestamp (秒)
+  authCode?: string;
+}
 ```
 
-## 7. 已知限制
+---
 
-- iOS 端 `TencentOpenAPI` 由腾讯发布在 CocoaPods，但版本更新不频繁。如果集成失败，可手工把 `TencentOpenAPI.framework` 放到 `ios/Frameworks/` 并修改 podspec 的 `s.vendored_frameworks`。
-- Android `qqopensdk` 在 Maven Central 历史上不稳定，国内推荐用 [腾讯 Maven 仓库](https://maven.tencent.com) 或本地 jar 引入。
-- QQ Open Platform 政策要求接入隐私合规弹窗，本库通过 `Tencent.setIsPermissionGranted(true)` 显式声明已获得用户同意，**调用方必须在弹出隐私同意后再 `registerApp`**。
+## 6. 隐私授权 — 关于 `agreePrivacy`
+
+QQ 互联 SDK 在 2021 年后强制要求接入方先弹出隐私协议弹窗并取得用户同意，才能调用任何会联网的方法。本库的对应实现：
+
+- iOS：`registerApp` 调用前会按 `agreePrivacy` 值调用 `TencentOAuth.setIsPermissionGranted:` 和 `setIsUserAgreedAuthorization:`（runtime 探测，老 SDK 无此 API 时自动跳过）。
+- Android：调用 `Tencent.setIsPermissionGranted(agreePrivacy)`。
+
+**错误用法**：在用户尚未确认隐私弹窗前就 `registerApp({ agreePrivacy: true })`——这等同于伪造同意，应用市场审核会驳回。
+
+**正确用法**：
+
+```ts
+// App.tsx
+async function bootstrap() {
+  const agreed = await ensurePrivacyConsent();   // 自己弹窗 + 持久化
+  registerApp({ appId, universalLink, agreePrivacy: agreed });
+}
+```
+
+---
+
+## 7. 从 0.1.x（Nitro 版）升级
+
+| 0.1.x | 0.2.x |
+| --- | --- |
+| `import QQ from 'md-native-qq'` + `NitroModules.createHybridObject` | 同名导出，**API 形状不变** |
+| `MdNativeQQActivityBridge` 在 `com.margelo.nitro.mdnativeqq` | 换包到 `com.mangdin.mdnativeqq` |
+| `MdNativeQQURLHandler.handleUniversalLink` 直接 `return NO` | 真实接入 Universal Link |
+| 需 `react-native-nitro-modules` peer dep | 已移除 |
+| 安装后必须跑 `npm run nitrogen` | 不再需要 |
+| `registerApp({ appId, universalLink })` | `registerApp({ appId, universalLink, agreePrivacy })`（**新增 agreePrivacy，必传**） |
+
+迁移步骤：
+
+```bash
+# 1. 删旧
+npm uninstall react-native-nitro-modules
+
+# 2. 升级
+npm install md-native-qq@^0.2
+
+# 3. Android 改 import
+#    com.margelo.nitro.mdnativeqq.MdNativeQQActivityBridge
+# → com.mangdin.mdnativeqq.MdNativeQQActivityBridge
+
+# 4. iOS 重装
+cd ios && bundle exec pod install
+```
+
+---
+
+## 8. 已知限制
+
+- iOS 端 `TencentOpenAPI.xcframework` 必须自己下载（podspec 没有声明 CocoaPods 依赖，这是有意为之，避免 trunk 上版本滞后）。
+- Android `qqopensdk` 同样必须自己下载。维护成本是手动升级，收益是构建可控、出问题不用等腾讯发版。
+- 模拟器调试只能验证 SDK 加载和 JS 桥；登录 / 分享必须真机+真 QQ。
+- `shareMiniProgram` 在 iOS 端依赖 `QQApiMiniProgramObject`，仅 3.5.x 以上 SDK 提供；老版本会同步 reject。

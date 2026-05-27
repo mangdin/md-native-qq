@@ -3,5 +3,5 @@
   "compilerOptions": {
     "noEmit": false
   },
-  "exclude": ["lib", "nitrogen/generated"]
+  "exclude": ["lib", "node_modules", "**/__tests__/**"]
 }
