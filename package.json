@@ -1,6 +1,6 @@
 {
   "name": "md-native-qq",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "腾讯 QQ Open SDK 的 React Native 封装（NativeModules + NativeEventEmitter）：登录 / 分享 / QZone / Universal Link",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",

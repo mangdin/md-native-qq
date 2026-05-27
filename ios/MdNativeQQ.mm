@@ -50,7 +50,7 @@ static QQApiSendResultCode MdQQSend(QQApiObject *obj, NSString *scene) {
   if (!req) return EQQAPIMESSAGECONTENTINVALID;
 
   if ([scene isEqualToString:@"qzone"]) {
-    return [QQApiInterface sendReqToQZone:req];
+    return [QQApiInterface SendReqToQZone:req];
   }
   return [QQApiInterface sendReq:req];
 }
@@ -325,8 +325,8 @@ RCT_EXPORT_METHOD(shareLink:(NSDictionary *)params
                           objectWithURL:[NSURL URLWithString:params[@"webpageUrl"] ?: @""]
                           title:params[@"title"] ?: @""
                           description:params[@"description"] ?: @""
-                          previewImageData:thumb
-                          targetContentType:QQApiURLTargetTypeNews];
+                          previewImageData:thumb];
+  obj.targetContentType = QQApiURLTargetTypeNews;
   QQApiSendResultCode code = MdQQSend(obj, scene);
   if (code == EQQAPISENDSUCESS) callback(@[[NSNull null]]);
   else callback(@[[NSString stringWithFormat:@"send code=%d", (int)code]]);
@@ -340,8 +340,8 @@ RCT_EXPORT_METHOD(shareMusic:(NSDictionary *)params
                            objectWithURL:[NSURL URLWithString:params[@"webpageUrl"] ?: @""]
                            title:params[@"title"] ?: @""
                            description:params[@"description"] ?: @""
-                           previewImageData:thumb
-                           targetContentType:QQApiURLTargetTypeAudio];
+                           previewImageData:thumb];
+  obj.targetContentType = QQApiURLTargetTypeAudio;
   obj.flashURL = [NSURL URLWithString:params[@"musicUrl"] ?: @""];
   QQApiSendResultCode code = MdQQSend(obj, scene);
   if (code == EQQAPISENDSUCESS) callback(@[[NSNull null]]);
@@ -361,8 +361,8 @@ RCT_EXPORT_METHOD(shareMiniProgram:(NSDictionary *)params
                                objectWithURL:[NSURL URLWithString:params[@"webpageUrl"] ?: @""]
                                title:params[@"title"] ?: @""
                                description:params[@"description"] ?: @""
-                               previewImageData:thumb
-                               targetContentType:QQApiURLTargetTypeNews];
+                               previewImageData:thumb];
+  fallback.targetContentType = QQApiURLTargetTypeNews;
   id miniObj = [[miniCls alloc] init];
   if ([miniObj respondsToSelector:@selector(setMiniAppID:)])    [miniObj setValue:params[@"miniAppId"] forKey:@"miniAppID"];
   if ([miniObj respondsToSelector:@selector(setMiniPath:)])     [miniObj setValue:params[@"miniPath"] forKey:@"miniPath"];
@@ -387,7 +387,7 @@ RCT_EXPORT_METHOD(shareVideo:(NSDictionary *)params
                                    title:params[@"title"] ?: @""
                                    extMap:nil];
   SendMessageToQQReq *req = [SendMessageToQQReq reqWithContent:obj];
-  QQApiSendResultCode code = [QQApiInterface sendReqToQZone:req];
+  QQApiSendResultCode code = [QQApiInterface SendReqToQZone:req];
   if (code == EQQAPISENDSUCESS) callback(@[[NSNull null]]);
   else callback(@[[NSString stringWithFormat:@"send code=%d", (int)code]]);
 }
@@ -406,7 +406,7 @@ RCT_EXPORT_METHOD(publishToQzone:(NSDictionary *)params
                                         title:params[@"text"] ?: @""
                                         extMap:nil];
   SendMessageToQQReq *req = [SendMessageToQQReq reqWithContent:obj];
-  QQApiSendResultCode code = [QQApiInterface sendReqToQZone:req];
+  QQApiSendResultCode code = [QQApiInterface SendReqToQZone:req];
   if (code == EQQAPISENDSUCESS) callback(@[[NSNull null]]);
   else callback(@[[NSString stringWithFormat:@"send code=%d", (int)code]]);
 }
